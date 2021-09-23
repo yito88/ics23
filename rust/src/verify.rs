@@ -122,7 +122,7 @@ fn ensure_leaf(leaf: &ics23::LeafOp, leaf_spec: &ics23::LeafOp) -> Result<()> {
         leaf.length
     );
     ensure!(
-        has_prefix(&leaf_spec.prefix, &leaf.prefix),
+        leaf_spec.prefix.is_empty() || has_prefix(&leaf_spec.prefix, &leaf.prefix),
         "Incorrect prefix on leaf"
     );
     Ok(())
@@ -144,7 +144,7 @@ fn ensure_inner(inner: &ics23::InnerOp, spec: &ics23::ProofSpec) -> Result<()> {
                 inner.hash,
             );
             ensure!(
-                !has_prefix(&leaf_spec.prefix, &inner.prefix),
+                leaf_spec.prefix.is_empty() || !has_prefix(&leaf_spec.prefix, &inner.prefix),
                 "Inner node with leaf prefix",
             );
             ensure!(
@@ -350,6 +350,13 @@ mod tests {
             length: LengthOp::VarProto.into(),
             prefix: vec![0_u8],
         };
+        let empty_prefix_leaf = LeafOp {
+            hash: HashOp::Sha256.into(),
+            prehash_key: 0,
+            prehash_value: HashOp::Sha256.into(),
+            length: LengthOp::VarProto.into(),
+            prefix: vec![],
+        };
 
         let valid_inner = InnerOp {
             hash: HashOp::Sha256.into(),
@@ -366,10 +373,23 @@ mod tests {
             prefix: hex::decode("deadbeef00cafe00").unwrap(),
             suffix: vec![],
         };
+        let empty_prefix_inner = InnerOp {
+            hash: HashOp::Sha256.into(),
+            prefix: vec![],
+            suffix: vec![],
+        };
 
         let mut depth_limited_spec = api::iavl_spec();
         depth_limited_spec.min_depth = 2;
         depth_limited_spec.max_depth = 4;
+
+        let mut empty_prefix_spec = api::iavl_spec();
+        let mut leaf_spec = empty_prefix_spec.leaf_spec.unwrap();
+        leaf_spec.prefix = vec![];
+        empty_prefix_spec.leaf_spec = Some(leaf_spec);
+        let mut inner_spec = empty_prefix_spec.inner_spec.unwrap();
+        inner_spec.min_prefix_length = 0;
+        empty_prefix_spec.inner_spec = Some(inner_spec);
 
         let cases: HashMap<&'static str, ExistenceCase> = [
             (
@@ -510,6 +530,19 @@ mod tests {
                     },
                     spec: depth_limited_spec,
                     valid: false,
+                },
+            ),
+            (
+                "accepts empty prefix leaf and inner",
+                ExistenceCase {
+                    proof: ExistenceProof {
+                        key: b"foo".to_vec(),
+                        value: b"bar".to_vec(),
+                        leaf: Some(empty_prefix_leaf.clone()),
+                        path: vec![empty_prefix_inner],
+                    },
+                    spec: empty_prefix_spec,
+                    valid: true,
                 },
             ),
         ]
