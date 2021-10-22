@@ -1,5 +1,6 @@
 use alloc::format;
 use anyhow::{bail, ensure};
+use blake2::{Blake2b, Blake2s};
 use ripemd160::Ripemd160;
 use sha2::{Digest, Sha256, Sha512, Sha512Trunc256};
 use sha3::Sha3_512;
@@ -43,6 +44,8 @@ fn do_hash(hash: HashOp, data: &[u8]) -> Hash {
             Hash::from(Ripemd160::digest(Sha256::digest(data).as_slice()).as_slice())
         }
         HashOp::Sha512256 => Hash::from(Sha512Trunc256::digest(data).as_slice()),
+        HashOp::Blake2s => Hash::from(Blake2s::digest(data).as_slice()),
+        HashOp::Blake2b => Hash::from(Blake2b::digest(data).as_slice()),
     }
 }
 
@@ -115,6 +118,18 @@ mod tests {
         assert!(
             hash == decode("5b3a452a6acbf1fc1e553a40c501585d5bd3cca176d562e0a0e19a3c43804e88"),
             "sha512/256 hash fails"
+        );
+
+        let hash = do_hash(HashOp::Blake2s, b"food");
+        assert!(
+            hash == decode("5a1ec796f11f3dfc7e8ca5de13828edf2e910eb7dd41caaac356a4acbefb1758"),
+            "blake2s hash fails"
+        );
+
+        let hash = do_hash(HashOp::Blake2b, b"food");
+        assert!(
+            hash == decode("b1f115361afc179415d93d4f58dc2fc7d8fa434192d7cb9b65fca592f6aa904103d1f12b28655c2355478e10908ab002c418dc52a4367d8e645309cd25e3a504"),
+            "blake2b hash fails"
         );
     }
 
